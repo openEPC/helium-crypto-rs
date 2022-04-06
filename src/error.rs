@@ -29,7 +29,7 @@ pub enum Error {
     #[cfg(feature = "tpm")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tpm")))]
     #[error("TPM error")]
-    TPM(#[from] crate::tpm::Error),
+    TPM(#[from] helium_tpm::Error),
 }
 
 #[derive(Error, Debug)]
