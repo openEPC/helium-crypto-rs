@@ -2,6 +2,7 @@ use std::{
     convert::{TryFrom, TryInto},
     sync::Once,
 };
+use std::sync::{Arc, Mutex};
 
 use p256::{ecdsa};
 use sha2::{Digest, Sha256};
@@ -17,6 +18,7 @@ use crate::{
 
 
 static INIT: Once = Once::new();
+static mut COUNTER: Option<Arc<Mutex<i32>>> = None;
 
 pub struct Keypair {
     pub network: Network,
@@ -49,18 +51,38 @@ impl keypair::Sign for Keypair {
 
 impl Drop for Keypair {
     fn drop(&mut self) {
-        helium_tpm::tpm_deinit();
+        unsafe {
+            let mut num = COUNTER.as_ref().unwrap().lock().unwrap();
+            *num -= 1;
+            if *num == 0 {
+                tpm_deinit();
+                COUNTER = None;
+            }
+        }
     }
 }
 
 pub fn init() -> Result {
     if INIT.is_completed() {
+        unsafe {
+            let mut num = COUNTER.as_ref().unwrap().lock().unwrap();
+            *num += 1;
+        }
         return Ok(());
     }
 
-    helium_tpm::tpm_init()?;
 
-    Ok(())
+    let mut res: Result = Ok(());
+    INIT.call_once(|| {
+        res = tpm_init().map_err(|e| error::Error::from(e));
+        unsafe { COUNTER = Some(Arc::new(Mutex::new(0)));}
+    });
+
+    unsafe {
+        let mut num = COUNTER.as_ref().unwrap().lock().unwrap();
+        *num += 1;
+    }
+    return res;
 }
 
 impl Keypair {
@@ -100,6 +122,8 @@ impl Keypair {
         let mut shared_secret_bytes = vec![4u8];
         shared_secret_bytes.extend_from_slice(helium_tpm::ecdh(point, path)?.as_slice());
 
+        let encoded_point = p256::EncodedPoint::from_bytes(shared_secret_bytes.as_slice()).map_err(p256::elliptic_curve::Error::from)?;
+        let affine_point = p256::AffinePoint::from_encoded_point(&encoded_point).unwrap();
         let encoded_point = p256::EncodedPoint::from_bytes(shared_secret_bytes.as_slice()).map_err(p256::elliptic_curve::Error::from)?;
         let affine_point = p256::AffinePoint::from_encoded_point(&encoded_point).unwrap();
         Ok(ecc_compact::SharedSecret(p256::ecdh::SharedSecret::from(&affine_point)))
