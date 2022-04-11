@@ -6,9 +6,10 @@ use std::{
 use p256::{ecdsa};
 use sha2::{Digest, Sha256};
 
-use crate::{keypair, KeyTag, Network, public_key, Result, KeyType as CrateKeyType};
+use crate::{keypair, KeyTag, Network, public_key, Result, KeyType as CrateKeyType, error};
 
 use helium_tpm::{sign, ecdh, tpm_init, tpm_deinit, public_key, Error};
+use p256::elliptic_curve::sec1::FromEncodedPoint;
 
 use crate::{
     ecc_compact, ecc_compact::Signature,
@@ -89,18 +90,19 @@ impl Keypair {
 
     pub fn ecdh<'a, C>(&self, public_key: C) -> Result<ecc_compact::SharedSecret>
         where
-            C: TryInto<&'a p256::PublicKey, Error = Error>,
+            C: TryInto<&'a ecc_compact::PublicKey, Error = error::Error>,
     {
         use p256::elliptic_curve::sec1::ToEncodedPoint;
         let key = public_key.try_into()?;
-        let point = key.to_encoded_point(false);
+        let point = key.0.to_encoded_point(false);
         let path = &self.path;
 
-        let shared_secret_bytes = helium_tpm::ecdh(point, path)?;
+        let mut shared_secret_bytes = vec![4u8];
+        shared_secret_bytes.extend_from_slice(helium_tpm::ecdh(point, path)?.as_slice());
 
-        Ok(ecc_compact::SharedSecret(p256::ecdh::SharedSecret::from(
-            *p256::FieldBytes::from_slice(shared_secret_bytes.as_slice()))
-        ))
+        let encoded_point = p256::EncodedPoint::from_bytes(shared_secret_bytes.as_slice()).map_err(p256::elliptic_curve::Error::from)?;
+        let affine_point = p256::AffinePoint::from_encoded_point(&encoded_point).unwrap();
+        Ok(ecc_compact::SharedSecret(p256::ecdh::SharedSecret::from(&affine_point)))
     }
 }
 

@@ -90,6 +90,8 @@ impl Keypair {
             Self::EccCompact(keypair) => Ok(SharedSecret(keypair.ecdh(public_key)?)),
             #[cfg(feature = "ecc608")]
             Self::Ecc608(keypair) => Ok(SharedSecret(keypair.ecdh(public_key)?)),
+            #[cfg(feature = "tpm")]
+            Self::TPM(keypair) => Ok(SharedSecret(keypair.ecdh(public_key)?)),
             _ => Err(Error::invalid_curve()),
         }
     }
