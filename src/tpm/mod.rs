@@ -41,15 +41,19 @@ impl std::fmt::Debug for Keypair {
 
 impl keypair::Sign for Keypair {
     fn sign(&self, msg: &[u8]) -> Result<Vec<u8>> {
+        eprintln!("sign start");
         use signature::Signer;
         let signature = self.try_sign(msg)?;
+        eprintln!("sign end");
         Ok(signature.to_vec())
     }
 }
 
 impl Drop for Keypair {
     fn drop(&mut self) {
+        eprintln!("drop start");
         helium_tpm::tpm_deinit();
+        eprintln!("drop end");
     }
 }
 
@@ -57,18 +61,20 @@ pub fn init() -> Result {
     if INIT.is_completed() {
         return Ok(());
     }
-
+    eprintln!("init start");
     helium_tpm::tpm_init()?;
-
+    eprintln!("init end");
     Ok(())
 }
 
 impl Keypair {
     pub fn from_key_path(network: Network, key_path: String) -> Result<Keypair> {
+        eprintln!("from_key_path start");
         let bytes: Vec<u8> = Self::public_key(&key_path)?;
         let mut key_bytes = vec![4u8];
         key_bytes.extend_from_slice(bytes.as_slice());
         let public_key = ecc_compact::PublicKey::try_from(key_bytes.as_ref())?;
+        eprintln!("from_key_path end");
         Ok(Keypair {
             network,
             public_key: public_key::PublicKey::for_network(network, public_key),
@@ -77,7 +83,9 @@ impl Keypair {
     }
 
     fn public_key(key_path: &String) -> Result<Vec<u8>> {
+        eprintln!("public_key start");
         let res = helium_tpm::public_key(key_path)?;
+        eprintln!("public_key end");
         return Ok(res);
     }
 
@@ -92,6 +100,7 @@ impl Keypair {
         where
             C: TryInto<&'a ecc_compact::PublicKey, Error = error::Error>,
     {
+        eprintln!("ecdh start");
         use p256::elliptic_curve::sec1::ToEncodedPoint;
         let key = public_key.try_into()?;
         let point = key.0.to_encoded_point(false);
@@ -102,6 +111,7 @@ impl Keypair {
 
         let encoded_point = p256::EncodedPoint::from_bytes(shared_secret_bytes.as_slice()).map_err(p256::elliptic_curve::Error::from)?;
         let affine_point = p256::AffinePoint::from_encoded_point(&encoded_point).unwrap();
+        eprintln!("ecdh end");
         Ok(ecc_compact::SharedSecret(p256::ecdh::SharedSecret::from(&affine_point)))
     }
 }
