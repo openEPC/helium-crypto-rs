@@ -11,6 +11,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{keypair, KeyTag, Network, public_key, Result, KeyType as CrateKeyType,
             error, ecc_compact, ecc_compact::Signature};
+use crate::tpm::tpm_wrapper::TpmWrapper;
 
 
 #[derive(Debug, Error)]
@@ -39,6 +40,8 @@ pub struct Keypair {
     pub network: Network,
     pub public_key: public_key::PublicKey,
     pub path: String,
+
+    tpm_wrapper: TpmWrapper,
 }
 
 impl PartialEq<Self> for Keypair {
@@ -64,36 +67,24 @@ impl keypair::Sign for Keypair {
     }
 }
 
-impl Drop for Keypair {
-    fn drop(&mut self) {
-        tpm_wrapper::tpm_deinit();
-    }
-}
-
-pub fn init() -> Result {
-    if INIT.is_completed() {
-        return Ok(());
-    }
-
-    tpm_wrapper::tpm_init()?;
-    Ok(())
-}
-
 impl Keypair {
     pub fn from_key_path(network: Network, key_path: String) -> Result<Keypair> {
-        let bytes: Vec<u8> = Self::public_key(&key_path)?;
+        let mut tpm_wrapper = TpmWrapper::new();
+        tpm_wrapper.init()?;
+        let bytes: Vec<u8> = tpm_wrapper.public_key(&key_path)?;
         let mut key_bytes = vec![4u8];
         key_bytes.extend_from_slice(bytes.as_slice());
         let public_key = ecc_compact::PublicKey::try_from(key_bytes.as_ref())?;
         Ok(Keypair {
             network,
             public_key: public_key::PublicKey::for_network(network, public_key),
-            path: key_path
+            path: key_path,
+            tpm_wrapper,
         })
     }
 
-    fn public_key(key_path: &String) -> Result<Vec<u8>> {
-        let res = tpm_wrapper::public_key(key_path)?;
+    fn public_key(&self, key_path: &String) -> Result<Vec<u8>> {
+        let res = self.tpm_wrapper.public_key(key_path)?;
         return Ok(res);
     }
 
@@ -116,7 +107,7 @@ impl Keypair {
         let path = &self.path;
 
         let mut shared_secret_bytes = vec![4u8];
-        shared_secret_bytes.extend_from_slice(tpm_wrapper::ecdh(x, y, path)?.as_slice());
+        shared_secret_bytes.extend_from_slice(self.tpm_wrapper.ecdh(x, y, path)?.as_slice());
 
         let encoded_point = p256::EncodedPoint::from_bytes(shared_secret_bytes.as_slice()).map_err(p256::elliptic_curve::Error::from)?;
         let affine_point = p256::AffinePoint::from_encoded_point(&encoded_point).unwrap();
@@ -127,7 +118,7 @@ impl Keypair {
 impl signature::Signer<Signature> for Keypair {
     fn try_sign(&self, msg: &[u8]) -> std::result::Result<Signature, signature::Error> {
         let digest = Sha256::digest(msg).to_vec();
-        let sign_slice = tpm_wrapper::sign(&self.path, digest).map_err(|e| signature::Error::from_source(e))?;
+        let sign_slice = self.tpm_wrapper.sign(&self.path, digest).map_err(|e| signature::Error::from_source(e))?;
 
         let signature = ecdsa::Signature::from_der(&sign_slice[..])?;
         Ok(Signature(signature))
