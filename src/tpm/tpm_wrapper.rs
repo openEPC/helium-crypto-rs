@@ -24,6 +24,8 @@ pub struct TpmWrapper {
     tpm_ctx: Option<Mutex<*mut FAPI_CONTEXT>>
 }
 
+unsafe impl Send for TpmWrapper {}
+
 impl TpmWrapper {
     pub fn new() -> Self {
         TpmWrapper { tpm_ctx: None }
