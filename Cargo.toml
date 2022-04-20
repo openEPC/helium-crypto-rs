@@ -16,7 +16,7 @@ sha2 = "0"
 ed25519-dalek = { git = "https://github.com/helium/ed25519-dalek", branch = "madninja/bump_rand" }
 p256 = { version="0.10.1", default-features=false, features=["arithmetic", "ecdsa", "sha256", "ecdh"] }
 ecc608-linux = { version = "0", optional = true}
-tss2 = {version = "0", optional = true}
+tss2 = {version = "0", git = "https://github.com/openEPC/tss2-rs", branch = "static_lib", features = ["static"], optional = true}
 libc = {version = "0", optional = true}
 multihash = {version = "0", optional = true}
 
