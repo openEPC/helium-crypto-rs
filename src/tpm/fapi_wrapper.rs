@@ -21,7 +21,7 @@ macro_rules! tss2_call{
     ( $func:ident ( $( $arg:expr ),* $(,)? ) ) => {{
         match $func($($arg),*) {
             TSS2_RC_SUCCESS => Ok(()),
-            e => Err(TpmError::TPMError(stringify!($func), e)),
+            e => Err(TpmError::TPMFapiError(stringify!($func), e)),
         }
     }};
 }
