@@ -32,7 +32,9 @@ sqlx = {version = "0", optional = true, default-features=false}
 [features]
 default = []
 ecc608 = [ "ecc608-linux" ]
-tpm = ["tss2", "tss-esapi", "libc", "drop_guard"]
+tpm = []
+tpm_fapi = ["tss2", "libc", "drop_guard", "tpm"]
+tpm_esys = ["tss-esapi", "tpm"]
 multisig = ["multihash"]
 sqlx-postgres = ["sqlx/postgres", "sqlx/runtime-tokio-rustls"]
 

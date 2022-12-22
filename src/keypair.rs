@@ -16,10 +16,10 @@ pub enum Keypair {
     EccCompact(ecc_compact::Keypair),
     #[cfg(feature = "ecc608")]
     Ecc608(ecc608::Keypair),
-    #[cfg(feature = "tpm")]
-    TPMFapi(tpm::KeypairFapi),
-    #[cfg(feature = "tpm")]
-    TPMHandle(tpm::KeypairHandle),
+    #[cfg(feature = "tpm_fapi")]
+    TPMFapi(tpm::keypair_fapi::KeypairFapi),
+    #[cfg(feature = "tpm_esys")]
+    TPMHandle(tpm::keypair_esys::KeypairHandle),
 }
 
 pub struct SharedSecret(ecc_compact::SharedSecret);
@@ -32,9 +32,9 @@ impl Sign for Keypair {
             Self::EccCompact(keypair) => keypair.sign(msg),
             #[cfg(feature = "ecc608")]
             Self::Ecc608(keypair) => keypair.sign(msg),
-            #[cfg(feature = "tpm")]
+            #[cfg(feature = "tpm_fapi")]
             Self::TPMFapi(keypair) => keypair.sign(msg),
-            #[cfg(feature = "tpm")]
+            #[cfg(feature = "tpm_esys")]
             Self::TPMHandle(keypair) => keypair.sign(msg),
         }
     }
@@ -83,9 +83,9 @@ impl Keypair {
             Self::EccCompact(keypair) => keypair.key_tag(),
             #[cfg(feature = "ecc608")]
             Self::Ecc608(keypair) => keypair.key_tag(),
-            #[cfg(feature = "tpm")]
+            #[cfg(feature = "tpm_fapi")]
             Self::TPMFapi(keypair) => keypair.key_tag(),
-            #[cfg(feature = "tpm")]
+            #[cfg(feature = "tpm_esys")]
             Self::TPMHandle(keypair) => keypair.key_tag(),
         }
     }
@@ -97,9 +97,9 @@ impl Keypair {
             Self::EccCompact(keypair) => &keypair.public_key,
             #[cfg(feature = "ecc608")]
             Self::Ecc608(keypair) => &keypair.public_key,
-            #[cfg(feature = "tpm")]
+            #[cfg(feature = "tpm_fapi")]
             Self::TPMFapi(keypair) => &keypair.public_key,
-            #[cfg(feature = "tpm")]
+            #[cfg(feature = "tpm_esys")]
             Self::TPMHandle(keypair) => &keypair.public_key,
         }
     }
@@ -109,9 +109,9 @@ impl Keypair {
             Self::EccCompact(keypair) => Ok(SharedSecret(keypair.ecdh(public_key)?)),
             #[cfg(feature = "ecc608")]
             Self::Ecc608(keypair) => Ok(SharedSecret(keypair.ecdh(public_key)?)),
-            #[cfg(feature = "tpm")]
+            #[cfg(feature = "tpm_fapi")]
             Self::TPMFapi(keypair) => Ok(SharedSecret(keypair.ecdh(public_key)?)),
-            #[cfg(feature = "tpm")]
+            #[cfg(feature = "tpm_esys")]
             Self::TPMHandle(keypair) => Ok(SharedSecret(keypair.ecdh(public_key)?)),
             _ => Err(Error::invalid_curve()),
         }
@@ -124,9 +124,9 @@ impl Keypair {
             Self::EccCompact(keypair) => keypair.to_vec(),
             #[cfg(feature = "ecc608")]
             Self::Ecc608(_) => panic!("not supported"),
-            #[cfg(feature = "tpm")]
+            #[cfg(feature = "tpm_fapi")]
             Self::TPMFapi(_) => panic!("not supported"),
-            #[cfg(feature = "tpm")]
+            #[cfg(feature = "tpm_esys")]
             Self::TPMHandle(_) => panic!("not supported"),
         }
     }
@@ -138,9 +138,9 @@ impl Keypair {
             Self::EccCompact(keypair) => keypair.secret_to_vec(),
             #[cfg(feature = "ecc608")]
             Self::Ecc608(_) => panic!("not supported"),
-            #[cfg(feature = "tpm")]
+            #[cfg(feature = "tpm_fapi")]
             Self::TPMFapi(_) => panic!("not supported"),
-            #[cfg(feature = "tpm")]
+            #[cfg(feature = "tpm_esys")]
             Self::TPMHandle(_) => panic!("not supported"),
         }
     }
@@ -171,16 +171,16 @@ impl From<ecc608::Keypair> for Keypair {
     }
 }
 
-#[cfg(feature = "tpm")]
-impl From<tpm::KeypairFapi> for Keypair {
-    fn from(keypair: tpm::KeypairFapi) -> Self {
+#[cfg(feature = "tpm_fapi")]
+impl From<tpm::keypair_fapi::KeypairFapi> for Keypair {
+    fn from(keypair: tpm::keypair_fapi::KeypairFapi) -> Self {
         Self::TPMFapi(keypair)
     }
 }
 
-#[cfg(feature = "tpm")]
-impl From<tpm::KeypairHandle> for Keypair {
-    fn from(keypair: tpm::KeypairHandle) -> Self {
+#[cfg(feature = "tpm_esys")]
+impl From<tpm::keypair_esys::KeypairHandle> for Keypair {
+    fn from(keypair: tpm::keypair_esys::KeypairHandle) -> Self {
         Self::TPMHandle(keypair)
     }
 }
@@ -339,18 +339,18 @@ mod tests {
         });
     }
 
-    #[cfg(feature = "tpm")]
+    #[cfg(feature = "tpm_fapi")]
     #[test]
     fn sign_tpm_fapi() {
-        let keypair = tpm::KeypairFapi::from_key_path(Network::MainNet, "HS/SRK/MinerKey").unwrap();
+        let keypair = tpm::keypair_fapi::KeypairFapi::from_key_path(Network::MainNet, "HS/SRK/MinerKey").unwrap();
 
         sign_test_keypair(&Keypair::TPMFapi(keypair));
     }
 
-    #[cfg(feature = "tpm")]
+    #[cfg(feature = "tpm_esys")]
     #[test]
     fn sign_tpm_handle() {
-        let keypair = tpm::KeypairHandle::from_key_handle(Network::MainNet, 0x81000031).unwrap();
+        let keypair = tpm::keypair_esys::KeypairHandle::from_key_handle(Network::MainNet, 0x81000031).unwrap();
 
         sign_test_keypair(&Keypair::TPMHandle(keypair));
     }
@@ -363,18 +363,18 @@ mod tests {
         });
     }
 
-    #[cfg(feature = "tpm")]
+    #[cfg(feature = "tpm_fapi")]
     #[test]
     fn ecdh_tpm_fapi() {
-        let keypair = tpm::KeypairFapi::from_key_path(Network::MainNet, "HS/SRK/MinerKey").unwrap();
+        let keypair = tpm::keypair_fapi::KeypairFapi::from_key_path(Network::MainNet, "HS/SRK/MinerKey").unwrap();
 
         ecdh_test_keypair(&Keypair::TPMFapi(keypair));
     }
 
-    #[cfg(feature = "tpm")]
+    #[cfg(feature = "tpm_esys")]
     #[test]
     fn ecdh_tpm_handle() {
-        let keypair = tpm::KeypairHandle::from_key_handle(Network::MainNet, 0x81000031).unwrap();
+        let keypair = tpm::keypair_esys::KeypairHandle::from_key_handle(Network::MainNet, 0x81000031).unwrap();
 
         ecdh_test_keypair(&Keypair::TPMHandle(keypair));
     }
