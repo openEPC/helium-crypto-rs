@@ -7,6 +7,7 @@ use crate::{
 use p256::{ecdsa, elliptic_curve::sec1::FromEncodedPoint};
 use sha2::{Digest, Sha256};
 use std::convert::{TryFrom, TryInto};
+use k256::elliptic_curve::group::GroupEncoding;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -88,7 +89,7 @@ impl Keypair {
             .map_err(p256::elliptic_curve::Error::from)?;
         let affine_point = p256::AffinePoint::from_encoded_point(&encoded_point).unwrap();
         Ok(ecc_compact::SharedSecret(p256::ecdh::SharedSecret::from(
-            &affine_point,
+            *p256::FieldBytes::from_slice(affine_point.to_bytes().as_slice()),
         )))
     }
 }
